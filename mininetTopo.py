@@ -1,6 +1,6 @@
 '''
 Please add your name:
-Please add your matric number: 
+Please add your matric number:
 '''
 
 import os
@@ -16,22 +16,30 @@ from mininet.node import RemoteController
 net = None
 
 class TreeTopo(Topo):
-			
-	def __init__(self):
-		# Initialize topology
-		Topo.__init__(self)        
-	
-	# You can write other functions as you need.
 
-	# Add hosts
-    # > self.addHost('h%d' % [HOST NUMBER])
+    def build(self):
+        switches = dict()
+        hosts = dict()
+        N, M, L, = 0, 0 ,0
 
-	# Add switches
-    # > sconfig = {'dpid': "%016x" % [SWITCH NUMBER]}
-    # > self.addSwitch('s%d' % [SWITCH NUMBER], **sconfig)
-
-	# Add links
-	# > self.addLink([HOST1], [HOST2])
+        with open("topology.in", "r") as infile:
+                for i, line in enumerate(infile):
+                        if i == 0:
+                                N, M, L = [int(v) for v in line.split()]
+                                for i in range(1, N+1):
+                                        name = "h" + str(i)
+                                        hosts[name] = self.addHost(name)
+                                for i in range(1, M+1):
+                                        name = "s" + str(i)
+                                        switches[name] = self.addSwitch(name)
+                        else:
+                                h, s, bw = line.split(",")
+                                dev2 = switches[s]
+                                if h[0] == "h":
+                                        dev1 = hosts[h]
+                                else:
+                                        dev1 = switches[h]
+                                self.addLink(dev1, dev2, bw=int(bw))
 
 def startNetwork():
     info('** Creating the tree network\n')
@@ -39,7 +47,7 @@ def startNetwork():
 
     global net
     net = Mininet(topo=topo, link = Link,
-                  controller=lambda name: RemoteController(name, ip='SERVER IP'),
+                  controller=lambda name: RemoteController(name, ip='192.168.56.1'),
                   listenPort=6633, autoSetMacs=True)
 
     info('** Starting the network\n')
