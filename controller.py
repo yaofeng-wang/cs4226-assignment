@@ -13,6 +13,7 @@ import pox.openflow.libopenflow_01 as of
 import pox.openflow.discovery
 import pox.openflow.spanning_forest
 
+import pox.lib.packet as pkt
 from pox.lib.revent import EventMixin
 from pox.lib.util import dpid_to_str
 from pox.lib.addresses import IPAddr, EthAddr
@@ -62,7 +63,7 @@ class Controller(EventMixin):
 
             msg = of.ofp_flow_mod()
             msg.hard_timeout = self.ttl
-            msg.match = of.ofp_match()
+            msg.match = of.ofp_match() # redundant
             msg.match.dl_dst = dst
             action = of.ofp_action_output(port=destination_port)
             msg.actions.append(action)
@@ -79,17 +80,39 @@ class Controller(EventMixin):
     def _handle_ConnectionUp(self, event):
         dpid = dpid_to_str(event.dpid)
         log.debug("Switch %s has come up.", dpid)
+        policies = [
+            ["10.0.0.1", 4001],
+            ["10.0.0.1", "10.0.0.2", 1000],
+            # ["10.0.0.1"],
+            # ["10.0.0.3"],
+            # ["10.0.0.7"]
+        ]
 
         # Send the firewall policies to the switch
         def sendFirewallPolicy(connection, policy):
-            # define your message here
+            log.debug("Set policy")
+            msg = of.ofp_flow_mod()
+            if len(policy) == 1:
+                return
+            elif len(policy) == 2:
+                msg.match.dl_type = pkt.ethernet.IP_TYPE
+                msg.match.nw_proto = pkt.ipv4.TCP_PROTOCOL
+                msg.match.nw_dst = IPAddr(policy[0])
+                msg.match.tp_dst = policy[1]
+            elif len(policy) == 3:
+                msg.match.dl_type = pkt.ethernet.IP_TYPE
+                msg.match.nw_proto = pkt.ipv4.TCP_PROTOCOL
+                msg.match.nw_src = IPAddr(policy[0])
+                msg.match.nw_dst = IPAddr(policy[1])
+                msg.match.tp_dst = policy[2]
+            else:
+                log.debug("Unknown policy")
+            msg.actions.append(of.ofp_action_output(port = of.OFPP_NONE))
+            connection.send(msg)
 
-            # OFPP_NONE: outputting to nowhere
-            # msg.actions.append(of.ofp_action_output(port = of.OFPP_NONE))
-            pass
+        for policy in policies:
+            sendFirewallPolicy(event.connection, policy)
 
-        # for i in [FIREWALL_POLICIES]:
-        #     sendFirewallPolicy(event.connection, i)
 
 
 def launch():
