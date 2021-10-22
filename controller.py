@@ -1,6 +1,6 @@
 '''
-Please add your name:
-Please add your matric number:
+Please add your name: Wang Yao Feng
+Please add your matric number: A0121802X
 '''
 import time
 import sys
