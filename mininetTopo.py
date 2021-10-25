@@ -167,7 +167,7 @@ def startNetwork():
     topo = CustomTopo()
 
     global net
-    net = Mininet(topo=topo, link = TCLink,
+    net = Mininet(topo=topo, link = Link,
                   controller=lambda name: RemoteController(name, ip='192.168.56.1'),
                   listenPort=6633,
 		  autoSetMacs=True,
