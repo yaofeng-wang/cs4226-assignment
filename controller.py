@@ -77,7 +77,7 @@ class Controller(EventMixin):
 
     def _handle_PacketIn(self, event):
         packet = event.parsed
-        log.debug("%s arrived", packet)
+        log.debug("%d:%s arrived" % (event.dpid, packet))
 
         dpid = event.dpid
         packet_in = event.ofp
@@ -92,7 +92,7 @@ class Controller(EventMixin):
         mac_to_port[src] = (packet_in.in_port, current_time)
 
         if dst in mac_to_port and current_time - mac_to_port[dst][1] <= self.ttl:
-            log.debug("Installing flow for %s", packet)
+            log.debug("%d:Installing flow for %s" % (event.dpid, packet))
 
             dst_port = mac_to_port[dst][0]
             self.resend_packet(dpid, packet_in, dst_port, qid)
@@ -102,22 +102,23 @@ class Controller(EventMixin):
             msg.hard_timeout = self.ttl
             msg.match = of.ofp_match() # redundant
             msg.match.dl_dst = dst
+            msg.match.dl_src = src
             action = of.ofp_action_enqueue(port=dst_port, queue_id=qid)
             msg.actions.append(action)
             # action = of.ofp_action_output(port = dst_port)
             # msg.actions.append(action)
             core.openflow.sendToDPID(dpid, msg)
         elif dst in mac_to_port:
-            log.debug("Flood with expired entry")
+            log.debug("%d:Flood with expired entry" % event.pid)
             mac_to_port.pop(dst)
-            self.resend_packet(dpid, packet_in, of.OFPP_ALL, qid)
+            self.resend_packet(dpid, packet_in, of.OFPP_FLOOD, qid)
         else:
-            log.debug("Flood")
-            self.resend_packet(dpid, packet_in, of.OFPP_ALL, qid)
+            log.debug("%d:Flood" % event.dpid)
+            self.resend_packet(dpid, packet_in, of.OFPP_FLOOD, qid)
 
-        for k, v in self.storage.items():
-            log.debug("switch %s: %s...(%s)", k, v.keys(), time.time())
-        log.debug("\n")
+        # for k, v in self.storage.items():
+        #     log.debug("%d switch %s: %s...(%s)" % (event.dpid, k, v.keys(), time.time()))
+        # log.debug("\n")
 
     def _handle_ConnectionUp(self, event):
         dpid = dpid_to_str(event.dpid)
