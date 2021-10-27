@@ -84,7 +84,7 @@ class Controller(EventMixin):
         dst = packet.dst
         src = packet.src
         qid = 1 if (str(dst) in self.premium_addr and str(src) in self.premium_addr) else 2
-        # priority = LEARNING_SWITCH_PRIORITY if qid == 2 else PREMIUM_TRAFFIC_PRIORITY
+        priority = LEARNING_SWITCH_PRIORITY if qid == 2 else PREMIUM_TRAFFIC_PRIORITY
         if dpid not in self.storage:
             self.storage[dpid] = dict()
         mac_to_port = self.storage[dpid]
@@ -98,7 +98,7 @@ class Controller(EventMixin):
             self.resend_packet(dpid, packet_in, dst_port, qid)
 
             msg = of.ofp_flow_mod()
-            # msg.priority = priority
+            msg.priority = priority
             msg.hard_timeout = self.ttl
             msg.match = of.ofp_match() # redundant
             msg.match.dl_dst = dst
@@ -127,7 +127,7 @@ class Controller(EventMixin):
         # Send the firewall policies to the switch
         def sendFirewallPolicy(connection, policy):
             msg = of.ofp_flow_mod()
-            # msg.priority = FIREWALL_PRIORITY
+            msg.priority = FIREWALL_PRIORITY
             if len(policy) == 1:
                 return
             elif len(policy) == 2:
