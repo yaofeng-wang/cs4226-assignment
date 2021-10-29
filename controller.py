@@ -89,7 +89,8 @@ class Controller(EventMixin):
         packet_in = event.ofp
         dst = packet.dst
         src = packet.src
-        qid = 1 if (str(dst) in self.premium_addr and str(src) in self.premium_addr) else 2
+        # qid = 1 if (str(dst) in self.premium_addr and str(src) in self.premium_addr) else 2
+        qid = 1 if str(dst) in self.premium_addr else 2
         priority = LEARNING_SWITCH_PRIORITY if qid == 2 else PREMIUM_TRAFFIC_PRIORITY
         if dpid not in self.storage:
             self.storage[dpid] = dict()
