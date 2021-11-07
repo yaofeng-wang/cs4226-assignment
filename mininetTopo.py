@@ -18,102 +18,29 @@ net = None
 
 READ_MODE = "r"
 TOPO_FILE_NAME = "topology.in"
-
-class TCIntf(TCIntf):
-
-    def config( self, bw=None, delay=None, jitter=None, loss=None,
-                gro=False, txo=True, rxo=True,
-                speedup=0, use_hfsc=False, use_tbf=False,
-                latency_ms=None, enable_ecn=False, enable_red=False,
-                max_queue_size=None, **params ):
-
-            # Support old names for parameters
-            gro = not params.pop( 'disable_gro', not gro )
-            result = Intf.config( self, **params)
-
-            def on( isOn ):
-                    "Helper method: bool -> 'on'/'off'"
-                    return 'on' if isOn else 'off'
-
-            # Set offload parameters with ethool
-            self.cmd( 'ethtool -K', self,
-                      'gro', on( gro ),
-                      'tx', on( txo ),
-                      'rx', on( rxo ) )
-
-            # Optimization: return if nothing else to configure
-            # Question: what happens if we want to reset things?
-            if ( bw is None and not delay and not loss
-                     and max_queue_size is None ):
-                    return None
-
-            # Clear existing configuration
-            tcoutput = self.tc( '%s qdisc show dev %s' )
-            if "priomap" not in tcoutput and "noqueue" not in tcoutput:
-                    cmds = [ '%s qdisc del dev %s root' ]
-            else:
-                    cmds = []
-
-            # Bandwidth limits via various methods
-            bwcmds, parent = self.bwCmds( bw=bw, speedup=speedup,
-                                      use_hfsc=use_hfsc, use_tbf=use_tbf,
-                                      latency_ms=latency_ms,
-                                      enable_ecn=enable_ecn,
-                                      enable_red=enable_red )
-            cmds += bwcmds
-
-            # Delay/jitter/loss/max_queue_size using netem
-            delaycmds, parent = self.delayCmds( delay=delay, jitter=jitter,
-                                            loss=loss,
-                                            max_queue_size=max_queue_size,
-                                            parent=parent )
-            cmds += delaycmds
-
-            # Ugly but functional: display configuration info
-            stuff = ( ( [ '%.2fMbit' % bw ] if bw is not None else [] ) +
-                      ( [ '%s delay' % delay ] if delay is not None else [] ) +
-                      ( [ '%s jitter' % jitter ] if jitter is not None else [] ) +
-                      ( ['%.5f%% loss' % loss ] if loss is not None else [] ) +
-                      ( [ 'ECN' ] if enable_ecn else [ 'RED' ]
-                        if enable_red else [] ) )
-            #info( '(' + ' '.join( stuff ) + ') ' )
-
-            # Execute all the commands in our node
-            debug("at map stage w/cmds: %s\n" % cmds)
-            tcoutputs = [ self.tc(cmd) for cmd in cmds ]
-            for output in tcoutputs:
-                if output != '':
-                	error( "*** Error: %s" % output )
-            	debug( "cmds:", cmds, '\n' )
-                debug( "outputs:", tcoutputs, '\n' )
-            result[ 'tcoutputs'] = tcoutputs
-            result[ 'parent' ] = parent
-
-            return result
-
 class Link(Link):
 
     def __init__( self, node1, node2, port1=None, port2=None,
-                  intfName1=None, intfName2=None, addr1=None, addr2=None,
-                  intf=Intf, cls1=None, cls2=None, params1=None,
-                  params2=None, fast=True, **params ):
-            # This is a bit awkward; it seems that having everything in
+            intfName1=None, intfName2=None, addr1=None, addr2=None,
+            intf=Intf, cls1=None, cls2=None, params1=None,
+            params2=None, fast=True, **params ):
+        # This is a bit awkward; it seems that having everything in
             # params is more orthogonal, but being able to specify
             # in-line arguments is more convenient! So we support both.
             params1 = dict( params1 ) if params1 else {}
             params2 = dict( params2 ) if params2 else {}
             if port1 is not None:
-                    params1[ 'port' ] = port1
+                params1[ 'port' ] = port1
             if port2 is not None:
-                   params2[ 'port' ] = port2
+                params2[ 'port' ] = port2
             if 'port' not in params1:
-                    params1[ 'port' ] = node1.newPort()
+                params1[ 'port' ] = node1.newPort()
             if 'port' not in params2:
-                    params2[ 'port' ] = node2.newPort()
+                params2[ 'port' ] = node2.newPort()
             if not intfName1:
-                    intfName1 = self.intfName( node1, params1[ 'port' ] )
+                intfName1 = self.intfName( node1, params1[ 'port' ] )
             if not intfName2:
-                    intfName2 = self.intfName( node2, params2[ 'port' ] )
+                intfName2 = self.intfName( node2, params2[ 'port' ] )
 
             # Update with remaining parameter list
             params1.update( params )
@@ -121,32 +48,25 @@ class Link(Link):
 
             self.fast = fast
             if fast:
-                    params1.setdefault( 'moveIntfFn', self._ignore )
-                    params2.setdefault( 'moveIntfFn', self._ignore )
-                    self.makeIntfPair( intfName1, intfName2, addr1, addr2,
+                params1.setdefault( 'moveIntfFn', self._ignore )
+                params2.setdefault( 'moveIntfFn', self._ignore )
+                self.makeIntfPair( intfName1, intfName2, addr1, addr2,
                             node1, node2, deleteIntfs=False )
             else:
-                    self.makeIntfPair( intfName1, intfName2, addr1, addr2 )
+                self.makeIntfPair( intfName1, intfName2, addr1, addr2 )
 
             if not cls1:
-                    cls1 = intf
+                cls1 = intf
             if not cls2:
-                    cls2 = intf
+                cls2 = intf
 
             intf1 = cls1( name=intfName1, node=node1,
-                          link=self, mac=addr1, **params1  )
+                    link=self, mac=addr1, **params1  )
             intf2 = cls2( name=intfName2, node=node2,
-                          link=self, mac=addr2, **params2 )
+                    link=self, mac=addr2, **params2 )
 
             # All we are is dust in the wind, and our two interfaces
             self.intf1, self.intf2 = intf1, intf2
-
-class TCLink(Link):
-
-    def __init__( self, *args, **kwargs):
-        kwargs.setdefault( 'cls1', TCIntf )
-        kwargs.setdefault( 'cls2', TCIntf )
-        Link.__init__( self, *args, **kwargs)
 
 class CustomTopo(Topo):
 
@@ -177,10 +97,10 @@ def startNetwork():
 
     global net
     net = Mininet(topo=topo, link = Link,
-                  controller=lambda name: RemoteController(name, ip='192.168.56.1'),
-                  listenPort=6633,
-          autoSetMacs=True,
-          xterms=True)
+            controller=lambda name: RemoteController(name, ip='192.168.56.1'),
+            listenPort=6633,
+            autoSetMacs=True,
+            xterms=True)
 
     info('** Starting the network\n')
     net.start()
@@ -201,9 +121,9 @@ def startNetwork():
                         -- --id=@q0 create queue other-config:max-rate=%d other-config:min-rate=%d \
                         -- --id=@q1 create queue other-config:min-rate=%d \
                         -- --id=@q2 create queue other-config:max-rate=%d'
-                    % (intf, bw, bw, bw, X, Y))
+                        % (intf, bw, bw, bw, X, Y))
                 info("Set up QoS Queue for %s: %s<->%s (%d)\n" %
-                    (intf, dev1, dev2, intf.params["bw"]))
+                        (intf, dev1, dev2, intf.params["bw"]))
                 info("%d %d %d\n\n" % (bw, X, Y))
 
     info('** Running CLI\n')
@@ -214,8 +134,8 @@ def perfTest():
     topo = SingleSwitchTopo(n=4)
     # modify the ip address if you are using a remote pox controller
     net = Mininet(topo=topo, link=Link,
-                  controller=lambda name: RemoteController(name, ip='127.0.0.1'),
-                  listenPort=6633, autoSetMacs=True)
+            controller=lambda name: RemoteController(name, ip='127.0.0.1'),
+            listenPort=6633, autoSetMacs=True)
     net.start()
     info("Dumping host connections")
     dumpNodeConnections(net.hosts)
